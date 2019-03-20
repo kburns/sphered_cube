@@ -10,10 +10,7 @@ def BC_rows(N):
     N2 = N + N1 + 1
     N3 = N + N2 + 1
     N4 = N + N3 + 1
-    N5 = N + N4 + 1
-    N6 = N + N5 + 1
-
-    return N0,N1,N2,N3,N4,N5,N6
+    return N0,N1,N2,N3,N4
 
 def matrices(B, N, ell, Prandtl, eta, alpha_BC):
 
@@ -29,43 +26,35 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
 
     Z = B.op('0',N,0,ell)
 
-    N0,N1,N2,N3,N4,N5,N6 = BC_rows(N)
+    N0,N1,N2,N3,N4 = BC_rows(N)
 
     if ell == 0:
         I = B.op('I',N,0,ell).tocsr()
         M44 = E(1, 0).dot(E( 0, 0))
-        M = sparse.bmat([[Z,Z,Z,Z,  Z,  Z, Z],
-                         [Z,Z,Z,Z,  Z,  Z, Z],
-                         [Z,Z,Z,Z,  Z,  Z, Z],
-                         [Z,Z,Z,Z,  Z,  Z, Z],
-                         [Z,Z,Z,Z,M44,  Z, Z],
-                         [Z,Z,Z,Z,  Z,M44, Z],
-                         [Z,Z,Z,Z,  Z,  I, Z]]).tocsr()
+        M = sparse.bmat([[Z,Z,Z,Z,  Z],
+                         [Z,Z,Z,Z,  Z],
+                         [Z,Z,Z,Z,  Z],
+                         [Z,Z,Z,Z,  Z],
+                         [Z,Z,Z,Z,M44]]).tocsr()
         L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
-        L = sparse.bmat([[I,Z,Z,Z,  Z,  Z, Z],
-                         [Z,I,Z,Z,  Z,  Z, Z],
-                         [Z,Z,I,Z,  Z,  Z, Z],
-                         [Z,Z,Z,I,  Z,  Z, Z],
-                         [Z,Z,Z,Z,L44,  Z, Z],
-                         [Z,Z,Z,Z,  Z,L44, Z],
-                         [Z,Z,Z,Z,  Z,  Z,-I]]).tocsr()
+        L = sparse.bmat([[I,Z,Z,Z,  Z],
+                         [Z,I,Z,Z,  Z],
+                         [Z,Z,I,Z,  Z],
+                         [Z,Z,Z,I,  Z],
+                         [Z,Z,Z,Z,L44]]).tocsr()
 
-        row0=np.concatenate(( np.zeros(N3+1), B.op('r=1',N,1,ell+1) @ D(+1,0,0) , np.zeros(N6-N4) ))
-        row1=np.concatenate(( np.zeros(N4+1), B.op('r=1',N,1,ell+1) @ D(+1,0,0) , np.zeros(N6-N5) ))
+        row0=np.concatenate(( np.zeros(N3+1), B.op('r=1',N,0,ell) ))
 
         tau0 = C(0)[:,-1]
         tau0 = tau0.reshape((len(tau0),1))
 
-        col0 = np.concatenate((np.zeros((N3+1,1)),tau0,np.zeros((N6-N4,1))))
-        col1 = np.concatenate((np.zeros((N4+1,1)),tau0,np.zeros((N6-N5,1))))
+        col0 = np.concatenate((np.zeros((N3+1,1)),tau0))
 
-        L = sparse.bmat([[   L, col0, col1],
-                         [row0,    0,    0],
-                         [row1,    0,    0]])
+        L = sparse.bmat([[   L, col0],
+                         [row0,    0]])
 
-        M = sparse.bmat([[     M, 0*col0, 0*col1],
-                         [0*row0,      0,      0],
-                         [0*row1,      0,      0]])
+        M = sparse.bmat([[     M, 0*col0],
+                         [0*row0,      0]])
 
         L = L.tocsr()
         M = M.tocsr()
@@ -78,23 +67,19 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
     M11 = 1/Prandtl*E(1, 0).dot(E( 0, 0))
     M22 = 1/Prandtl*E(1,+1).dot(E( 0,+1))
     M44 = E(1, 0).dot(E( 0, 0))
-    M55 = E(1, 0).dot(E( 0, 0))
     I = B.op('I',N,0,ell).tocsr()
 
-    M=sparse.bmat([[M00, Z,   Z, Z,   Z,   Z, Z],
-                   [Z, M11,   Z, Z,   Z,   Z, Z],
-                   [Z,   Z, M22, Z,   Z,   Z, Z],
-                   [Z,   Z,   Z, Z,   Z,   Z, Z],
-                   [Z,   Z,   Z, Z, M44,   Z, Z],
-                   [Z,   Z,   Z, Z,   Z, M55, Z],
-                   [Z,   Z,   Z, Z,   Z,   I, Z]])
+    M=sparse.bmat([[M00, Z,   Z, Z,   Z],
+                   [Z, M11,   Z, Z,   Z],
+                   [Z,   Z, M22, Z,   Z],
+                   [Z,   Z,   Z, Z,   Z],
+                   [Z,   Z,   Z, Z, M44]])
     M = M.tocsr()
 
-    L00 = -D(-1,1, 0).dot(D(+1, 0,-1)) + E(1,-1).dot(E( 0,-1))/eta
-    L11 = -D(-1,1,+1).dot(D(+1, 0, 0)) + E(1, 0).dot(E( 0, 0))/eta
-    L22 = -D(+1,1, 0).dot(D(-1, 0,+1)) + E(1,+1).dot(E( 0,+1))/eta
+    L00 = -D(-1,1, 0).dot(D(+1, 0,-1))
+    L11 = -D(-1,1,+1).dot(D(+1, 0, 0))
+    L22 = -D(+1,1, 0).dot(D(-1, 0,+1))
     L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
-    L55 = -D(-1,1,+1).dot(D(+1, 0, 0))
 
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = xip*E(+1,+1).dot(D(+1,0,0))
@@ -105,13 +90,11 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
     L04 = Z
     L24 = Z
 
-    L=sparse.bmat([[L00,  Z,   Z, L03, L04,   Z,  Z],
-                   [Z,  L11,   Z,   Z,   Z,   Z,  Z],
-                   [Z,    Z, L22, L23, L24,   Z,  Z],
-                   [L30,  Z, L32,   Z,   Z,   Z,  Z],
-                   [Z,    Z,   Z,   Z, L44,   Z,  Z],
-                   [Z,    Z,   Z,   Z,   Z, L55,  Z],
-                   [Z,    Z,   Z,   Z,   Z,   Z, -I]])
+    L=sparse.bmat([[L00,  Z,   Z, L03, L04],
+                   [Z,  L11,   Z,   Z,   Z],
+                   [Z,    Z, L22, L23, L24],
+                   [L30,  Z, L32,   Z,   Z],
+                   [Z,    Z,   Z,   Z, L44]])
     L = L.tocsr()
 
     Q = B.Q[(ell,2)]
@@ -129,70 +112,57 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
     QSp = Q[:,2::3].dot(rD[2::3])
     u0m = B.op('r=1',N,0,ell-1)*B.Q[(ell,1)][1,0]
     u0p = B.op('r=1',N,0,ell+1)*B.Q[(ell,1)][1,2]
-    N0, N1, N2, N3, N4, N5, N6 = BC_rows(N)
+    N0, N1, N2, N3, N4 = BC_rows(N)
 
-    Dr_scalar = ( B.Q[(ell,1)][1,0]*B.op('r=1',N,1,ell-1) @ D(-1,0,0)
-                + B.Q[(ell,1)][1,2]*B.op('r=1',N,1,ell+1) @ D(+1,0,0) )
-
-#    row0=np.concatenate(( QSm[1]+QSm[3], QS0[1]+QS0[3] , QSp[1]+QSp[3], np.zeros(N6-N2)))
-#    row1=np.concatenate(( u0m          , np.zeros(N0+1), u0p          , np.zeros(N6-N2)))
-#    row2=np.concatenate(( QSm[5]+QSm[7], QS0[5]+QS0[7] , QSp[5]+QSp[7], np.zeros(N6-N2)))
-    row0=np.concatenate(( B.op('r=1',N,0,ell-1), np.zeros(N6-N0)))
-    row1=np.concatenate(( np.zeros(N0+1), B.op('r=1',N,0,ell), np.zeros(N6-N1)))
-    row2=np.concatenate(( np.zeros(N1+1), B.op('r=1',N,0,ell+1), np.zeros(N6-N2)))
-    row3=np.concatenate(( np.zeros(N3+1), Dr_scalar, np.zeros(N6-N4) ))
-    row4=np.concatenate(( np.zeros(N4+1), Dr_scalar , np.zeros(N6-N5) ))
+    row0=np.concatenate(( B.op('r=1',N,0,ell-1), np.zeros(N4-N0)))
+    row1=np.concatenate(( np.zeros(N0+1), B.op('r=1',N,0,ell), np.zeros(N4-N1)))
+    row2=np.concatenate(( np.zeros(N1+1), B.op('r=1',N,0,ell+1), np.zeros(N4-N2)))
+    row3=np.concatenate(( np.zeros(N3+1), B.op('r=1',N,0,ell) ))
 
     tau0 = C(-1)[:,-1]
     tau1 = C( 0)[:,-1]
     tau2 = C( 1)[:,-1]
     tau3 = C( 0)[:,-1]
-    tau4 = C( 0)[:,-1]
 
     tau0 = tau0.reshape((len(tau0),1))
     tau1 = tau1.reshape((len(tau1),1))
     tau2 = tau2.reshape((len(tau2),1))
     tau3 = tau3.reshape((len(tau3),1))
-    tau4 = tau4.reshape((len(tau4),1))
 
-    col0 = np.concatenate((                   tau0,np.zeros((N6-N0,1))))
-    col1 = np.concatenate((np.zeros((N0+1,1)),tau1,np.zeros((N6-N1,1))))
-    col2 = np.concatenate((np.zeros((N1+1,1)),tau2,np.zeros((N6-N2,1))))
-    col3 = np.concatenate((np.zeros((N3+1,1)),tau3,np.zeros((N6-N4,1))))
-    col4 = np.concatenate((np.zeros((N4+1,1)),tau4,np.zeros((N6-N5,1))))
+    col0 = np.concatenate((                   tau0,np.zeros((N4-N0,1))))
+    col1 = np.concatenate((np.zeros((N0+1,1)),tau1,np.zeros((N4-N1,1))))
+    col2 = np.concatenate((np.zeros((N1+1,1)),tau2,np.zeros((N4-N2,1))))
+    col3 = np.concatenate((np.zeros((N3+1,1)),tau3))
 
-    L = sparse.bmat([[   L, col0, col1, col2, col3, col4],
-                     [row0,    0 ,   0,    0,    0,    0],
-                     [row1,    0 ,   0,    0,    0,    0],
-                     [row2,    0,    0,    0,    0,    0],
-                     [row3,    0,    0,    0,    0,    0],
-                     [row4,    0,    0,    0,    0,    0]])
+    L = sparse.bmat([[   L, col0, col1, col2, col3],
+                     [row0,    0 ,   0,    0,    0],
+                     [row1,    0 ,   0,    0,    0],
+                     [row2,    0,    0,    0,    0],
+                     [row3,    0,    0,    0,    0]])
 
-    M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2, 0*col3, 0*col4],
-                     [0*row0,      0,      0,      0,      0,      0],
-                     [0*row1,      0,      0,      0,      0,      0],
-                     [0*row2,      0,      0,      0,      0,      0],
-                     [0*row3,      0,      0,      0,      0,      0],
-                     [0*row4,      0,      0,      0,      0,      0]])
+    M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2, 0*col3],
+                     [0*row0,      0,      0,      0,      0],
+                     [0*row1,      0,      0,      0,      0],
+                     [0*row2,      0,      0,      0,      0],
+                     [0*row3,      0,      0,      0,      0]])
 
     L = L.tocsr()
     M = M.tocsr()
-
     return M, L
 
 # calculate RHS terms from state vector
-def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, S, alpha, eps):
+def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, psi):
     sb = state_vector.simpleball
     B = sb.B
 
     DT = ball_wrapper.TensorField_3D(1, sb.B, sb.domain)
     om = ball_wrapper.TensorField_3D(1, sb.B, sb.domain)
 
-    u, p, T, psi, a = state_vector.tensors
-    u_rhs, p_rhs, T_rhs, psi_rhs, a_rhs = RHS.tensors
+    u, p, T = state_vector.tensors
+    u_rhs, p_rhs, T_rhs = RHS.tensors
 
     # get U in coefficient space
-    state_vector.unpack([u,p,T,psi,a])
+    state_vector.unpack([u,p,T])
 
     DT.layout = 'c'
     om.layout = 'c'
@@ -205,17 +175,17 @@ def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, S, alpha, eps):
     # R = ez cross u
     theta = sb.theta
     r = sb.r
-    ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
+    ez = np.array([np.cos(theta), -np.sin(theta), 0*np.cos(theta)])
+    z = r*np.cos(theta)
+    T_ref = -z
     u_rhs.layout = 'g'
     T_rhs.layout = 'g'
     u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
-    u_rhs['g'] += 1/eta*psi['g']*u['g']
-    g = psi['g']**2 * (1-psi['g'])**2
-    gprime = 2*psi['g']*(1-3*psi['g']+2*psi['g']**2)
-    u_rhs['g'][0] += Rayleigh*r*T['g'][0]
-    T_rhs['g'][0] = np.sqrt(Rayleigh)*np.exp(-r/0.1) - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2])
-    T_rhs['g'][0] -= S*30*g[0]*a['g'][0]
-    psi_rhs['g'][0] = alpha/eps/S*30*g[0]*T['g'][0]-1/(4*eps**2)*gprime[0]
+    u_rhs['g'] -= 1/eta*psi['g']*u['g']
+    u_rhs['g'][0] += Rayleigh*ez[0]*T['g'][0]
+    u_rhs['g'][1] += Rayleigh*ez[1]*T['g'][0]
+    T_rhs['g'][0] = - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2]) - 1/eta*psi['g']*T['g']
+    T_rhs['g'][0] += u['g'][0]*ez[0] + u['g'][1]*ez[1]
 
     # transform (ell, r) -> (ell, N)
     for ell in range(sb.ell_start, sb.ell_end+1):
@@ -228,6 +198,5 @@ def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, S, alpha, eps):
         u_rhs['c'][ell_local] = M[ell_local][:u_len,:u_len].dot(u_rhs['c'][ell_local])*Prandtl
         p_len = p_rhs['c'][ell_local].shape[0]
         T_rhs['c'][ell_local] = M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(T_rhs['c'][ell_local])
-        psi_rhs['c'][ell_local]=M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(psi_rhs['c'][ell_local])
 
-    RHS.pack([u_rhs,p_rhs,T_rhs,psi_rhs,p_rhs])
+    RHS.pack([u_rhs,p_rhs,T_rhs])

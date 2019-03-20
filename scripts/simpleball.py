@@ -65,8 +65,9 @@ class StateVector:
         self.data = []
         for ell in range(sb.ell_start, sb.ell_end+1):
             if ell == 0:
-                taus = np.zeros(2)
-            else: taus = np.zeros(5)
+                taus = np.zeros(1)
+            else:
+                taus = np.zeros(4)
             ell_local = ell - sb.ell_start
             for m in range(sb.m_start, sb.m_end+1):
                 m_local = m - sb.m_start
@@ -78,8 +79,9 @@ class StateVector:
         sb = self.simpleball
         for ell in range(sb.ell_start, sb.ell_end+1):
             if ell == 0:
-                taus = np.zeros(2)
-            else: taus = np.zeros(5)
+                taus = np.zeros(1)
+            else:
+                taus = np.zeros(4)
             ell_local = ell - sb.ell_start
             for m in range(sb.m_start, sb.m_end+1):
                 m_local = m - sb.m_start
