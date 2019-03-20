@@ -34,17 +34,19 @@ N_dealias = 3/2
 
 # Physical parameters
 Prandtl = 1
-Rayleigh = 1e7
+Rayleigh = 1e6
 
 # Volume penalization
-eta = 1e-4
-width = 0.1
+eta = 1e-3
+width = 0.01
 
 # Temporal discretization
 t_end = 20
-dt = 7e-6
-dt_max = 7e-6
-snapshots_cadence = 1e-4
+dt = 1e-4
+dt_max = 1e-4
+safety = 0.5
+threshold = 0.1
+snapshots_cadence = 1e-3
 snapshots_time = -1e-20
 
 
@@ -114,13 +116,12 @@ logger.info(theta_index)
 snapshots = FileHandler(data_dir,domain,B,max_writes=50)
 snapshots.add_task(T,name='T eq',index=0,proj=('theta',theta_index))
 snapshots.add_task(u,name='ur eq',index=0,proj=('theta',theta_index))
+snapshots.add_task(T, name='T', index=0)
 
 t = 0.
 
 reducer = GlobalArrayReducer(domain.dist.comm_cart)
 dr = np.gradient(r[0,0])
-safety = 0.35
-threshold = 0.1
 
 def calculate_dt(dt_old):
     local_freq = u['g'][0]/dr + u['g'][1]*(L_max+1) + u['g'][2]*(L_max+1)
