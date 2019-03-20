@@ -57,11 +57,9 @@ simpleball = SimpleBall(L_max, N_max, R_max, L_dealias, N_dealias)
 domain = simpleball.domain
 B = simpleball.B
 
-om = ball.TensorField_3D(1,B,domain)
 u  = ball.TensorField_3D(1,B,domain)
 p  = ball.TensorField_3D(0,B,domain)
 T  = ball.TensorField_3D(0,B,domain)
-DT = ball.TensorField_3D(1,B,domain)
 psi =ball.TensorField_3D(0,B,domain)
 a  = ball.TensorField_3D(0,B,domain)
 
@@ -69,6 +67,7 @@ u_rhs = ball.TensorField_3D(1,B,domain)
 p_rhs = ball.TensorField_3D(0,B,domain)
 T_rhs = ball.TensorField_3D(0,B,domain)
 psi_rhs=ball.TensorField_3D(0,B,domain)
+a_rhs = ball.TensorField_3D(0,B,domain)
 
 noise = ball.TensorField_3D(0,B,domain)
 
@@ -95,7 +94,7 @@ def SVWrap(*args):
     return StateVector(simpleball, args)
 
 state_vector = StateVector(simpleball, [u,p,T,psi,a])
-NL = StateVector(simpleball, [u,p,T,psi,a])
+NL = StateVector(simpleball, [u_rhs,p_rhs,T_rhs,psi_rhs,a_rhs])
 timestepper = timesteppers.SBDF2(SVWrap, u,p,T,psi,a)
 
 # build matrices
@@ -107,48 +106,6 @@ for ell in range(simpleball.ell_start, simpleball.ell_end+1):
     L.append(L_ell.astype(np.complex128))
     P.append(M_ell.astype(np.complex128))
     LU.append([None])
-
-# calculate RHS terms from state vector
-def nonlinear(state_vector, RHS, t):
-
-    # get U in coefficient space
-    state_vector.unpack([u,p,T,psi,a])
-
-    DT.layout = 'c'
-    om.layout = 'c'
-    # take derivatives
-    for ell in range(simpleball.ell_start,simpleball.ell_end+1):
-        ell_local = ell - simpleball.ell_start
-        B.curl(ell,1,u['c'][ell_local],om['c'][ell_local])
-        DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local])
-
-    # R = ez cross u
-    ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
-    u_rhs.layout = 'g'
-    T_rhs.layout = 'g'
-    u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
-    u_rhs['g'] += 1/eta*psi['g']*u['g']
-    g = psi['g']**2 * (1-psi['g'])**2
-    gprime = 2*psi['g']*(1-3*psi['g']+2*psi['g']**2)
-    u_rhs['g'][0] += Rayleigh*r*T['g'][0]
-    T_rhs['g'][0] = np.sqrt(Rayleigh)*np.exp(-r/0.1) - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2])
-    T_rhs['g'][0] -= S*30*g[0]*a['g'][0]
-    psi_rhs['g'][0] = alpha/eps/S*30*g[0]*T['g'][0]-1/(4*eps**2)*gprime[0]
-
-    # transform (ell, r) -> (ell, N)
-    for ell in range(simpleball.ell_start, simpleball.ell_end+1):
-        ell_local = ell - simpleball.ell_start
-
-        N = N_max - B.N_min(ell-R_max)
-
-        # multiply by conversion matrices (may be very important)
-        u_len = u_rhs['c'][ell_local].shape[0]
-        u_rhs['c'][ell_local] = M[ell_local][:u_len,:u_len].dot(u_rhs['c'][ell_local])*Prandtl
-        p_len = p_rhs['c'][ell_local].shape[0]
-        T_rhs['c'][ell_local] = M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(T_rhs['c'][ell_local])
-        psi_rhs['c'][ell_local]=M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(psi_rhs['c'][ell_local])
-
-    NL.pack([u_rhs,p_rhs,T_rhs,psi_rhs,p_rhs])
 
 reducer = GlobalArrayReducer(domain.dist.comm_cart)
 
@@ -178,17 +135,18 @@ dt_max = 7e-6
 threshold = 0.1
 
 def calculate_dt(dt_old):
-  local_freq = u['g'][0]/dr + u['g'][1]*(L_max+1) + u['g'][2]*(L_max+1)
-  global_freq = reducer.global_max(local_freq)
-  if global_freq == 0.:
-    dt = np.inf
-  else:
-    dt = 1 / global_freq
-  dt *= safety
-  if dt > dt_max: dt = dt_max
-
-  if dt < dt_old*(1+threshold) and dt > dt_old*(1-threshold): dt = dt_old
-  return dt
+    local_freq = u['g'][0]/dr + u['g'][1]*(L_max+1) + u['g'][2]*(L_max+1)
+    global_freq = reducer.global_max(local_freq)
+    if global_freq == 0.:
+        dt = np.inf
+    else:
+        dt = 1 / global_freq
+        dt *= safety
+    if dt > dt_max:
+        dt = dt_max
+    if dt < dt_old*(1+threshold) and dt > dt_old*(1-threshold):
+        dt = dt_old
+    return dt
 
 
 t_list = []
@@ -200,7 +158,7 @@ iter = 0
 
 while t<t_end:
 
-    nonlinear(state_vector,NL,t)
+    equations.nonlinear(state_vector, NL, t, M, Prandtl, Rayleigh, eta, S, alpha, eps)
 
     if iter % 10 == 0:
         E0 = np.sum(simpleball.weight_r*simpleball.weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)

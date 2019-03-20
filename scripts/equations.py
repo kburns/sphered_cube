@@ -1,6 +1,6 @@
 
 import numpy as np
-from dedalus_sphere import ball128
+from dedalus_sphere import ball128, ball_wrapper
 from scipy import sparse
 
 
@@ -180,3 +180,54 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
 
     return M, L
 
+# calculate RHS terms from state vector
+def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, S, alpha, eps):
+    sb = state_vector.simpleball
+    B = sb.B
+
+    DT = ball_wrapper.TensorField_3D(1, sb.B, sb.domain)
+    om = ball_wrapper.TensorField_3D(1, sb.B, sb.domain)
+
+    u, p, T, psi, a = state_vector.tensors
+    u_rhs, p_rhs, T_rhs, psi_rhs, a_rhs = RHS.tensors
+
+    # get U in coefficient space
+    state_vector.unpack([u,p,T,psi,a])
+
+    DT.layout = 'c'
+    om.layout = 'c'
+    # take derivatives
+    for ell in range(sb.ell_start,sb.ell_end+1):
+        ell_local = ell - sb.ell_start
+        B.curl(ell,1,u['c'][ell_local],om['c'][ell_local])
+        DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local])
+
+    # R = ez cross u
+    theta = sb.theta
+    r = sb.r
+    ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
+    u_rhs.layout = 'g'
+    T_rhs.layout = 'g'
+    u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
+    u_rhs['g'] += 1/eta*psi['g']*u['g']
+    g = psi['g']**2 * (1-psi['g'])**2
+    gprime = 2*psi['g']*(1-3*psi['g']+2*psi['g']**2)
+    u_rhs['g'][0] += Rayleigh*r*T['g'][0]
+    T_rhs['g'][0] = np.sqrt(Rayleigh)*np.exp(-r/0.1) - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2])
+    T_rhs['g'][0] -= S*30*g[0]*a['g'][0]
+    psi_rhs['g'][0] = alpha/eps/S*30*g[0]*T['g'][0]-1/(4*eps**2)*gprime[0]
+
+    # transform (ell, r) -> (ell, N)
+    for ell in range(sb.ell_start, sb.ell_end+1):
+        ell_local = ell - sb.ell_start
+
+        N = sb.N_max - B.N_min(ell-sb.R_max)
+
+        # multiply by conversion matrices (may be very important)
+        u_len = u_rhs['c'][ell_local].shape[0]
+        u_rhs['c'][ell_local] = M[ell_local][:u_len,:u_len].dot(u_rhs['c'][ell_local])*Prandtl
+        p_len = p_rhs['c'][ell_local].shape[0]
+        T_rhs['c'][ell_local] = M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(T_rhs['c'][ell_local])
+        psi_rhs['c'][ell_local]=M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(psi_rhs['c'][ell_local])
+
+    RHS.pack([u_rhs,p_rhs,T_rhs,psi_rhs,p_rhs])
