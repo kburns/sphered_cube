@@ -1,10 +1,10 @@
-import ball_wrapper as ball
-import ball128
+from dedalus_sphere import ball_wrapper as ball
+from dedalus_sphere import ball128
 import numpy as np
-from   scipy.linalg      import eig
-from scipy.sparse        import linalg as spla
-import scipy.sparse      as sparse
-import scipy.special     as spec
+from   scipy.linalg import eig
+from scipy.sparse import linalg as spla
+import scipy.sparse as sparse
+import scipy.special as spec
 import dedalus.public as de
 from dedalus.extras.flow_tools import GlobalArrayReducer
 from dedalus.core.distributor import Distributor
@@ -13,9 +13,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-import timesteppers
+from dedalus_sphere import timesteppers
 import os
-from evaluator import FileHandler
+from dedalus.core.evaluator import FileHandler
 
 import logging
 logger = logging.getLogger(__name__)
@@ -33,19 +33,19 @@ def BC_rows(N):
     return N0,N1,N2,N3,N4,N5,N6
 
 def matrices(N,ell,Prandtl,eta):
-  
+
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
         if mu == -1: return B.op('D-',N,i,ell+deg)
-    
+
     def E(i,deg): return B.op('E',N,i,ell+deg)
 
     def C(deg): return ball128.connection(N,ell+deg,alpha_BC,2)
-    
+
     Z = B.op('0',N,0,ell)
-    
+
     N0,N1,N2,N3,N4,N5,N6 = BC_rows(N)
-    
+
     if ell == 0:
         I = B.op('I',N,0,ell).tocsr()
         M44 = E(1, 0).dot(E( 0, 0))
@@ -86,14 +86,14 @@ def matrices(N,ell,Prandtl,eta):
         M = M.tocsr()
 
         return M, L
-    
+
     xim, xip = B.xi([-1,+1],ell)
-    
+
     M00 = 1/Prandtl*E(1,-1).dot(E( 0,-1))
     M11 = 1/Prandtl*E(1, 0).dot(E( 0, 0))
     M22 = 1/Prandtl*E(1,+1).dot(E( 0,+1))
     M44 = E(1, 0).dot(E( 0, 0))
-    M55 = E(1, 0).dot(E( 0, 0)) 
+    M55 = E(1, 0).dot(E( 0, 0))
     I = B.op('I',N,0,ell).tocsr()
 
     M=sparse.bmat([[M00, Z,   Z, Z,   Z,   Z, Z],
@@ -104,16 +104,16 @@ def matrices(N,ell,Prandtl,eta):
                    [Z,   Z,   Z, Z,   Z, M55, Z],
                    [Z,   Z,   Z, Z,   Z,   I, Z]])
     M = M.tocsr()
-                   
+
     L00 = -D(-1,1, 0).dot(D(+1, 0,-1)) + E(1,-1).dot(E( 0,-1))/eta
     L11 = -D(-1,1,+1).dot(D(+1, 0, 0)) + E(1, 0).dot(E( 0, 0))/eta
     L22 = -D(+1,1, 0).dot(D(-1, 0,+1)) + E(1,+1).dot(E( 0,+1))/eta
     L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
     L55 = -D(-1,1,+1).dot(D(+1, 0, 0))
-               
+
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = xip*E(+1,+1).dot(D(+1,0,0))
-        
+
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
 
@@ -273,7 +273,7 @@ alpha = S/eps
 t_end = 20
 
 # Make domain
-mesh=[16,16]
+mesh=None
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_max+1, interval=(0,1),dealias=N_dealias)
@@ -439,7 +439,7 @@ def calculate_dt(dt_old):
     dt = 1 / global_freq
   dt *= safety
   if dt > dt_max: dt = dt_max
-  
+
   if dt < dt_old*(1+threshold) and dt > dt_old*(1-threshold): dt = dt_old
   return dt
 
@@ -453,7 +453,7 @@ iter = 0
 
 while t<t_end:
 
-    nonlinear(state_vector,NL,t) 
+    nonlinear(state_vector,NL,t)
 
     if iter % 10 == 0:
         E0 = np.sum(weight_r*weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
