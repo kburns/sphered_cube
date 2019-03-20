@@ -261,7 +261,6 @@ N_r = N_max
 # parameters
 Prandtl = 1
 Rayleigh = 1e7
-Taylor = 2*Rayleigh
 eps = 1e-2
 chi = 2.6482282
 #eta = (4*np.sqrt(2)*eps/chi)**2
@@ -379,7 +378,6 @@ def nonlinear(state_vector, RHS, t):
     u_rhs.layout = 'g'
     T_rhs.layout = 'g'
     u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
-    u_rhs['g'] += -np.sqrt(Taylor)*B.cross_grid(ez,u['g'])/Prandtl
     u_rhs['g'] += 1/eta*psi['g']*u['g']
     g = psi['g']**2 * (1-psi['g'])**2
     gprime = 2*psi['g']*(1-3*psi['g']+2*psi['g']**2)
