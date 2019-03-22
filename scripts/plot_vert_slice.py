@@ -62,7 +62,6 @@ def main(filename):
     background = T.coords['z']
 
     for i in range(T.shape[0]):
-
         dTi = T.isel(t=i) - background
         vmax = np.max(np.abs(dTi))
         dTi.isel(phi=0).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap='RdBu')
