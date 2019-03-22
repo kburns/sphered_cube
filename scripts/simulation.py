@@ -25,8 +25,8 @@ rank = comm.rank
 size = comm.size
 
 # Spatial discretization
-L_max = 63
-N_max = 63
+L_max = 127
+N_max = 127
 R_max = 3
 alpha_BC = 0
 L_dealias = 3/2
@@ -34,24 +34,26 @@ N_dealias = 3/2
 
 # Physical parameters
 Prandtl = 1
-Rayleigh = 1e6
+Reynolds = N_max**(4/3)
+Rayleigh = Prandtl * Reynolds**2
+t_ff = 1 / Reynolds
 
 # Volume penalization
-eta = 1e-3
-width = 0.01
+eta = Reynolds**(-1/2) * t_ff
+width = 1 / N_max
 
 # Temporal discretization
-t_end = 20
-dt = 1e-4
-dt_max = 1e-4
+t_end = 10
+dt = eta / 2
+dt_max = eta / 2
 safety = 0.5
 threshold = 0.1
-snapshots_cadence = 1e-3
+snapshots_cadence = t_ff
 snapshots_time = -1e-20
 
 
 # Domain
-mesh = None
+mesh = (7, 32)
 simpleball = SimpleBall(L_max, N_max, R_max, L_dealias, N_dealias, mesh=mesh)
 domain = simpleball.domain
 B = simpleball.B
@@ -96,6 +98,7 @@ timestepper = timesteppers.SBDF2(SVWrap, u,p,T)
 # build matrices
 M,L,P,LU = [],[],[],[]
 for ell in range(simpleball.ell_start, simpleball.ell_end+1):
+    logger.info('Building pencil ell = %i' %ell)
     N = B.N_max - B.N_min(ell-B.R_max)
     M_ell,L_ell = equations.matrices(B, N, ell, Prandtl, eta, alpha_BC)
     M.append(M_ell.astype(np.complex128))
