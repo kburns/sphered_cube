@@ -2,9 +2,10 @@
 Plot planes from joint analysis files.
 
 Usage:
-    plot_2d_series.py <files>... [--output=<dir>]
+    plot_vert_slices.py <files>... [--noextrap] [--output=<dir>]
 
 Options:
+    --noextrap      Don't extrapolate to coordinate endpoints
     --output=<dir>  Output directory [default: ./frames]
 
 """
@@ -12,32 +13,33 @@ Options:
 import h5py
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 plt.ioff()
-from dedalus.extras import plot_tools
-import xarray as xr
 import h5py
-from mpi4py import MPI
-rank = MPI.COMM_WORLD.rank
-size = MPI.COMM_WORLD.size
+import xarray as xr
+
+import logging
+logger = logging.getLogger(__name__)
+
 
 def hdf5_to_xarray(h5_data):
-    """Convert hdf5 dataset to xarray dataset."""
+    """Convert hdf5 dataset to xarray."""
     data = h5_data[:]
     coords = [(dim.label, dim[0][:]) for dim in h5_data.dims]
     xr_data = xr.DataArray(data, coords=[coords[0], coords[3], coords[2], coords[1]])
     return xr_data
 
-def get_data(filename, task, skip=1):
+def load_task_xarray(filename, task, skip=1):
+    """Load saved task as xarray."""
     # Load file
     file = h5py.File(filename, 'r')
     # Get data
-    #return file['tasks'][task]
     xr = hdf5_to_xarray(file['tasks'][task])
     return xr
 
 def extrap_full_sphere(X):
+    """Extrapolate spherical grid data to singularities."""
     # Extrapolate in theta
     X_0 = X.interp(theta=0, kwargs={'fill_value': 'extrapolate'})
     X_pi = X.interp(theta=np.pi, kwargs={'fill_value': 'extrapolate'})
@@ -47,53 +49,80 @@ def extrap_full_sphere(X):
     X = xr.concat([X_0, X], dim='r')
     return X
 
-def main(filename):
-    """Save plot of specified tasks for given range of analysis writes."""
+
+def main(filename, output_path, extrapolate=True):
+
+    logger.info('Plotting from file: %s' %filename)
 
     # Plot settings
-    savename_func = lambda write: 'write_{:06}.png'.format(write)
     dpi = 200
-    s = 1 / np.sqrt(3)
+    cmap = 'RdBu'
     plt.figure(figsize=(6,6))
 
-    T = extrap_full_sphere(get_data(filename, 'T'))
-    T.coords['z'] = T.coords['r'] * np.cos(T.coords['theta'])
+    # Load temperature perturbation
+    T = load_task_xarray(filename, 'T')
+    if extrapolate:
+        T = extrap_full_sphere(T)
+
+    # Add cartesian coords
     T.coords['x'] = T.coords['r'] * np.sin(T.coords['theta']) * np.cos(T.coords['phi'])
-    background = T.coords['z']
+    T.coords['y'] = T.coords['r'] * np.sin(T.coords['theta']) * np.sin(T.coords['phi'])
+    T.coords['z'] = T.coords['r'] * np.cos(T.coords['theta'])
+
+    # Background temperature
+    T0 = -T.coords['z']
+    # Box half-side length
+    s = 1 / np.sqrt(3)
+    # Azimuthal selections
+    phi0 = 0
+    phi1 = int(T.coords['phi'].size / 2)
 
     for i in range(T.shape[0]):
-        dTi = T.isel(t=i) - background
-        vmax = np.max(np.abs(dTi))
-        dTi.isel(phi=0).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap='RdBu')
-        dTi.isel(phi=192).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap='RdBu')
+        logger.info('  Plotting from write: %i' %i)
         plt.clf()
+        # Plot total temperature
+        Ti = T0 + T.isel(t=i)
+        vmax = np.max(np.abs(Ti))
+        Ti.isel(phi=phi0).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
+        Ti.isel(phi=phi1).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
         plt.title('')
         plt.axis('equal')
         plt.axis('off')
-        plt.savefig('frames/sphere_%03i.png' %i, dpi=dpi)
+        plt.savefig(str(output_path.joinpath('sphere_%03i.png' %i)), dpi=dpi)
+        # Save with box
         line, = plt.plot([s,s,-s,-s,s], [-s,s,s,-s,-s], '--k', lw=1)
-        plt.savefig('frames/spherebox_%03i.png' %i, dpi=dpi)
+        plt.savefig(str(output_path.joinpath('spherebox_%03i.png' %i)), dpi=dpi)
         line.set_visible(False)
+        # Save zoomed to box
         plt.xlim(-s, s)
         plt.ylim(-s, s)
-        plt.savefig('frames/box_%03i.png' %i, dpi=dpi)
+        plt.savefig(str(output_path.joinpath('box_%03i.png' %i)), dpi=dpi)
+
 
 if __name__ == "__main__":
 
     import pathlib
+    from mpi4py import MPI
     from docopt import docopt
-    from dedalus.tools import logging
-    from dedalus.tools import post
     from dedalus.tools.parallel import Sync
+    from dedalus.tools import logging
 
+    # Processes arguments
     args = docopt(__doc__)
-
+    files = args['<files>']
     output_path = pathlib.Path(args['--output']).absolute()
+    extrapolate = not args['--noextrap']
+
     # Create output directory if needed
     with Sync() as sync:
         if sync.comm.rank == 0:
             if not output_path.exists():
                 output_path.mkdir()
-    for file in args['<files>'][rank::size]:
-        main(file)
+
+    # Distribute and loop over files
+    rank = MPI.COMM_WORLD.rank
+    size = MPI.COMM_WORLD.size
+    local_files = files[rank::size]
+    for file in local_files:
+        main(file, output_path, extrapolate)
 
