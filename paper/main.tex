@@ -1,0 +1,87 @@
+\documentclass[letterpaper, 11pt]{article}
+
+%% Optional formatting
+
+% Layout
+\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0em}
+\usepackage{enumitem}
+\setlist{listparindent=\parindent}
+\setlist{parsep=\parskip}
+
+% Body font
+\usepackage{xcolor}
+\usepackage[colorlinks, allcolors=mitred, linktoc=all]{hyperref}
+\usepackage{newtxtext}
+\usepackage{newtxmath}
+%\usepackage{inconsolata}
+
+%% Necessary for compilation
+
+% Bibliography
+%\usepackage[style=authoryear-comp,
+%            maxcitenames=1,
+%            maxbibnames=5,
+%            uniquelist=false,
+%            natbib]{biblatex}
+%\bibliography{allpapers.bib, extras.bib}
+
+% Required packages (used in source)
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{graphicx}
+%\usepackage{wrapfig}
+\usepackage{hyperref}
+\usepackage{biblatex}
+\usepackage{booktabs}
+\usepackage{todonotes}
+%\usepackage{pythonhighlight}
+
+% Custom commands
+\input{commands}
+
+% Image path
+\graphicspath{{./images/}}
+
+% Document
+\begin{document}
+
+\title{The ``Sphered Cube'': A New Method for the Solution of Partial Differential Equations in Cubical Geometry}
+
+\author{Dedalus Collaboration}
+
+\maketitle
+
+\begin{abstract}
+
+A new gridding technique for the solution of partial differential equations in cubical geometry is presented.
+The method is based on volume penalization, allowing for the imposition of a cubical geometry inside of its circumscribing sphere.
+By choosing to embed the cube inside of the sphere, one obtains a discretization that is free of any sharp edges or corners.
+Taking full advantage of the simple geometry of the sphere, a spectral basis based on spin-weighted spherical harmonics and Jacobi polynomials, properly capturing the regularity of scalar, vector and tensor components in spherical coordinates, can be applied to obtain moderately efficient and accurate numerical solutions of partial differential equations in the cube.
+The advantages of this new technique over face-aligned coordinate methods are discussed in the context of applications on serial and parallel architectures.
+We present results for a test case incompressible hydrodynamics in cubical geometry: Rayleigh-Benard convection.
+Analysis of the simulations provides what is, to our knowledge, the first result on the scaling of the heat flux with the imposed thermal forcing for natural convection in the cube in the sphere.
+
+\end{abstract}
+
+\section{Introduction}
+
+\section{The sphered cube}
+
+\section{A variation of the GSZ polynomial method}
+
+\section{Results on single processor computers}
+
+The performance of Dedalus renders the utilization of single processor computers inadvisable.
+
+\section{The ``sphered cube'' on massively parallel architectures}
+
+\section{Conclusions}
+
+
+
+
+\end{document}
+
