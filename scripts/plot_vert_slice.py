@@ -85,7 +85,6 @@ def main(filename, output_path):
     plt.figure(figsize=(6,6))
     
     # Load temperature perturbation from hdf5
-    filename = '/Users/kburns/Dropbox/projects/sphered_cube/rbc_s1.h5'
     T_hdf5 = load_task_hdf5(filename, 'T')
     
     # Load xarray slice
