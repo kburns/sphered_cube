@@ -71,12 +71,12 @@ def main(filename, output_path):
 
     logger.info('Plotting from file: %s' %filename)
 
-    # Plot settings    
+    # Plot settings
     phi = 0
     dpi = 200
     cmap = 'RdBu_r'
     plt.figure(figsize=(6,6))
-    
+
     # Load temperature perturbation from hdf5
     file = h5py.File(filename, 'r')
     T_hdf5 = file['tasks']['T']
@@ -104,7 +104,8 @@ def main(filename, output_path):
         plt.clf()
         # Plot total temperature
         Ti = T0 + T.isel(t=i)
-        vmax = np.max(np.abs(Ti))
+        #vmax = np.max(np.abs(Ti))
+        vmax = 1
         Ti.isel(phi=0).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
         Ti.isel(phi=1).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
         plt.title('')
@@ -120,7 +121,7 @@ def main(filename, output_path):
         plt.xlim(-s, s)
         plt.ylim(-s, s)
         plt.savefig(str(output_path.joinpath('box_%03i.png' %writes[i])), dpi=dpi)
-        
+
     file.close()
 
 
