@@ -12,7 +12,7 @@ Options:
 import h5py
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.ioff()
 import h5py
