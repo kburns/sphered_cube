@@ -72,7 +72,7 @@ def main(filename, output_path):
     logger.info('Plotting from file: %s' %filename)
 
     # Plot settings
-    phi = 0
+    phi = np.pi/4
     dpi = 200
     cmap = 'RdBu_r'
     plt.figure(figsize=(6,6))
@@ -81,13 +81,14 @@ def main(filename, output_path):
     # Load temperature perturbation from hdf5
     file = h5py.File(filename, 'r')
     T_hdf5 = file['tasks']['T']
-    writes = file['scales']['write_number']
+    writes = file['scales']['write_number'][:]
 
     # Load xarray slice
     T = hdf5_vert_slice_to_xarray(T_hdf5, phi)
     T = T.reindex(theta=T.theta[::-1])
     T = extrap_r(T)
     T = extrap_theta(T)
+    file.close()
 
     # Add cartesian coords
     T.coords['x'] = T.coords['r'] * np.sin(T.coords['theta']) * np.cos(T.coords['phi'] - phi)
@@ -115,18 +116,16 @@ def main(filename, output_path):
         plt.xlim(-1-δ, 1+δ)
         plt.ylim(-1-δ, 1+δ)
         plt.axis('off')
-        plt.savefig(str(output_path.joinpath('sphere_%03i.png' %writes[i])), dpi=dpi)
+        plt.savefig(str(output_path.joinpath('sphere_%06i.png' %writes[i])), dpi=dpi)
         # Save with box
         ## WRONG FOR PHI != 0
         line, = plt.plot([s,s,-s,-s,s], [-s,s,s,-s,-s], '--k', lw=1)
-        plt.savefig(str(output_path.joinpath('spherebox_%03i.png' %writes[i])), dpi=dpi)
+        plt.savefig(str(output_path.joinpath('spherebox_%06i.png' %writes[i])), dpi=dpi)
         line.set_visible(False)
         # Save zoomed to box
         plt.xlim(-s-δ, s+δ)
         plt.ylim(-s-δ, s+δ)
-        plt.savefig(str(output_path.joinpath('box_%03i.png' %writes[i])), dpi=dpi)
-
-    file.close()
+        plt.savefig(str(output_path.joinpath('box_%06i.png' %writes[i])), dpi=dpi)
 
 
 if __name__ == "__main__":
