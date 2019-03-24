@@ -76,6 +76,7 @@ def main(filename, output_path):
     dpi = 200
     cmap = 'RdBu_r'
     plt.figure(figsize=(6,6))
+    plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
 
     # Load temperature perturbation from hdf5
     file = h5py.File(filename, 'r')
@@ -89,14 +90,16 @@ def main(filename, output_path):
     T = extrap_theta(T)
 
     # Add cartesian coords
-    T.coords['x'] = T.coords['r'] * np.sin(T.coords['theta']) * np.cos(T.coords['phi'])
-    T.coords['y'] = T.coords['r'] * np.sin(T.coords['theta']) * np.sin(T.coords['phi'])
+    T.coords['x'] = T.coords['r'] * np.sin(T.coords['theta']) * np.cos(T.coords['phi'] - phi)
+    T.coords['y'] = T.coords['r'] * np.sin(T.coords['theta']) * np.sin(T.coords['phi'] - phi)
     T.coords['z'] = T.coords['r'] * np.cos(T.coords['theta'])
 
     # Background temperature
     T0 = -T.coords['z']
     # Box half-side length
     s = 1 / np.sqrt(3)
+    # Plot padding
+    δ = 0.01
 
     # Plot writes
     for i in range(T.shape[0]):
@@ -109,7 +112,8 @@ def main(filename, output_path):
         Ti.isel(phi=0).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
         Ti.isel(phi=1).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
         plt.title('')
-        plt.axis('equal')
+        plt.xlim(-1-δ, 1+δ)
+        plt.ylim(-1-δ, 1+δ)
         plt.axis('off')
         plt.savefig(str(output_path.joinpath('sphere_%03i.png' %writes[i])), dpi=dpi)
         # Save with box
@@ -118,8 +122,8 @@ def main(filename, output_path):
         plt.savefig(str(output_path.joinpath('spherebox_%03i.png' %writes[i])), dpi=dpi)
         line.set_visible(False)
         # Save zoomed to box
-        plt.xlim(-s, s)
-        plt.ylim(-s, s)
+        plt.xlim(-s-δ, s+δ)
+        plt.ylim(-s-δ, s+δ)
         plt.savefig(str(output_path.joinpath('box_%03i.png' %writes[i])), dpi=dpi)
 
     file.close()
