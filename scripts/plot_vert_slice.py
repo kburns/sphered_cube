@@ -22,13 +22,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_task_hdf5(filename, task):
-    """Load task from hdf5."""
-    # Load file
-    file = h5py.File(filename, 'r')
-    return file['tasks'][task]
-
-
 def hdf5_to_xarray(h5_data, slices=None):
     """Convert hdf5 dataset to xarray."""
     if slices is None:
@@ -85,8 +78,10 @@ def main(filename, output_path):
     plt.figure(figsize=(6,6))
     
     # Load temperature perturbation from hdf5
-    T_hdf5 = load_task_hdf5(filename, 'T')
-    
+    file = h5py.File(filename, 'r')
+    T_hdf5 = file['tasks']['T']
+    writes = file['scales']['write_number']
+
     # Load xarray slice
     T = hdf5_vert_slice_to_xarray(T_hdf5, phi)
     T = T.reindex(theta=T.theta[::-1])
@@ -105,7 +100,7 @@ def main(filename, output_path):
 
     # Plot writes
     for i in range(T.shape[0]):
-        logger.info('  Plotting from write: %i' %i)
+        logger.info('  Plotting from write: %i' %writes[i])
         plt.clf()
         # Plot total temperature
         Ti = T0 + T.isel(t=i)
@@ -115,16 +110,18 @@ def main(filename, output_path):
         plt.title('')
         plt.axis('equal')
         plt.axis('off')
-        plt.savefig(str(output_path.joinpath('sphere_%03i.png' %i)), dpi=dpi)
+        plt.savefig(str(output_path.joinpath('sphere_%03i.png' %writes[i])), dpi=dpi)
         # Save with box
         ## WRONG FOR PHI != 0
         line, = plt.plot([s,s,-s,-s,s], [-s,s,s,-s,-s], '--k', lw=1)
-        plt.savefig(str(output_path.joinpath('spherebox_%03i.png' %i)), dpi=dpi)
+        plt.savefig(str(output_path.joinpath('spherebox_%03i.png' %writes[i])), dpi=dpi)
         line.set_visible(False)
         # Save zoomed to box
         plt.xlim(-s, s)
         plt.ylim(-s, s)
-        plt.savefig(str(output_path.joinpath('box_%03i.png' %i)), dpi=dpi)
+        plt.savefig(str(output_path.joinpath('box_%03i.png' %writes[i])), dpi=dpi)
+        
+    file.close()
 
 
 if __name__ == "__main__":
