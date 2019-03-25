@@ -111,7 +111,6 @@ def main(filename, output_path):
         plt.clf()
         # Plot total temperature
         Ti = T0 + T.isel(t=i)
-        #vmax = np.max(np.abs(Ti))
         vmax = 1
         Ti.isel(phi=0).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
         Ti.isel(phi=1).plot(x='x', y='z', add_colorbar=False, vmin=-vmax, vmax=vmax, cmap=cmap)
@@ -121,7 +120,6 @@ def main(filename, output_path):
         plt.axis('off')
         plt.savefig(str(output_path.joinpath('sphere_%06i.png' %writes[i])), dpi=dpi)
         # Save with box
-        ## WRONG FOR PHI != 0
         line, = plt.plot([sx,sx,-sx,-sx,sx], [-sz,sz,sz,-sz,-sz], '--k', lw=1, alpha=0.5)
         plt.savefig(str(output_path.joinpath('spherebox_%06i.png' %writes[i])), dpi=dpi)
         line.set_visible(False)
