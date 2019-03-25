@@ -7,8 +7,14 @@ import pathlib
 import h5py
 import numpy as np
 from mpi4py import MPI
+import itertools
+import shutil
+import time
+from concurrent.futures import wait
 
+from mpi4py.futures import MPICommExecutor
 from dedalus.tools.general import natural_sort
+from dedalus.tools.array import axslice
 
 import logging
 logger = logging.getLogger(__name__.split('.')[-1])
@@ -87,7 +93,7 @@ def get_all_writes(set_paths):
     return writes
 
 
-def get_assigned_sets(base_path, distributed=False):
+def get_all_sets(base_path, distributed=False, wrap=False):
     """
     Divide analysis sets from a FileHandler between MPI processes.
 
@@ -97,6 +103,8 @@ def get_assigned_sets(base_path, distributed=False):
         Base path of FileHandler output
     distributed : bool, optional
         Divide distributed sets instead of merged sets (default: False)
+    wrap : bool, optional
+
 
     """
     base_path = pathlib.Path(base_path)
@@ -108,10 +116,28 @@ def get_assigned_sets(base_path, distributed=False):
     else:
         set_paths = base_path.glob("{}_*.h5".format(base_stem))
     set_paths = natural_sort(set_paths)
+    return set_paths
+
+
+def get_assigned_sets(base_path, distributed=False, wrap=False):
+    """
+    Divide analysis sets from a FileHandler between MPI processes.
+
+    Parameters
+    ----------
+    base_path : str or pathlib.Path
+        Base path of FileHandler output
+    distributed : bool, optional
+        Divide distributed sets instead of merged sets (default: False)
+    wrap : bool, optional
+
+
+    """
+    set_paths = get_all_sets(base_path, distributed=distributed, wrap=wrap)
     return set_paths[MPI_RANK::MPI_SIZE]
 
 
-def merge_analysis(base_path, cleanup=False, include_last=True):
+def merge_analysis(base_path, cleanup=False):
     """
     Merge distributed analysis sets from a FileHandler.
 
@@ -134,6 +160,33 @@ def merge_analysis(base_path, cleanup=False, include_last=True):
     set_paths = get_assigned_sets(base_path, distributed=True)
     for set_path in set_paths:
         merge_distributed_set(set_path, cleanup=cleanup)
+
+
+def tree_merge_analysis(base_path, cleanup=False):
+    """
+    Merge distributed analysis sets from a FileHandler.
+
+    Parameters
+    ----------
+    base_path : str or pathlib.Path
+        Base path of FileHandler output
+    cleanup : bool, optional
+        Delete distributed files after merging (default: False)
+
+    Notes
+    -----
+    This function is parallelized over sets, and so can be effectively
+    parallelized up to the number of distributed sets.
+
+    """
+    set_path = pathlib.Path(base_path)
+    logger.info("Merging files from {}".format(base_path))
+
+    with MPICommExecutor() as executor:
+        if executor is not None:
+            set_paths = get_all_sets(base_path, distributed=True)
+            for set_path in set_paths:
+                tree_merge_distributed_set(set_path, executor, cleanup=cleanup)
 
 
 def merge_distributed_set(set_path, cleanup=False):
@@ -170,7 +223,66 @@ def merge_distributed_set(set_path, cleanup=False):
         set_path.rmdir()
 
 
-def merge_setup(joint_file, proc_path):
+def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False):
+    set_path = pathlib.Path(set_path)
+    logger.info("Merging set {}".format(set_path))
+    set_stem = set_path.stem
+    # Get process mesh
+    proc_path = set_path.joinpath(f"{set_stem}_p0.h5")
+    with h5py.File(str(proc_path), mode='r') as proc_file:
+        proc_dset = proc_file['tasks']['T']
+        global_shape = np.array(proc_dset.attrs['global_shape'])
+        local_shape = np.array(proc_dset.attrs['count'])
+    mesh = np.ceil(global_shape/local_shape).astype(int)
+    # Loop backwards over process mesh
+    procs = np.arange(np.prod(mesh)).reshape(mesh)
+    level = 0
+    for D in reversed(range(len(mesh))):
+        M = procs.shape[D]
+        # Recursively merge blocks
+        while M > 1:
+            futures = []
+            chunks = int(np.ceil(M / blocksize))
+            proc_blocks = np.array_split(procs, chunks, axis=D)
+            proc_blocks = [procs.reshape((-1, procs.shape[D])) for procs in proc_blocks]
+            proc_blocks = [procs.tolist() for procs in proc_blocks]
+            proc_blocks = list(itertools.chain(*zip(*proc_blocks)))
+            for proc_block in proc_blocks:
+                f = executor.submit(merge_level_procs, set_path, level, proc_block, D)
+                futures.append(f)
+            procs = procs[axslice(D, None, None, blocksize)]
+            M = procs.shape[D]
+            level += 1
+            wait(futures)
+    # Copy final output
+    proc_path = set_path.joinpath(f"{set_stem}_p0_l{level}.h5")
+    joint_path = set_path.parent.joinpath(f"{set_stem}.h5")
+    shutil.copy(str(proc_path), str(joint_path))
+
+
+def merge_level_procs(set_path, level, procs, axis, cleanup=False):
+    logger.info(f"Merging level procs: {set_path} level {level} procs {procs} axis {axis}")
+    set_path = pathlib.Path(set_path)
+    set_stem = set_path.stem
+    if level == 0:
+        proc_paths = [set_path.joinpath(f"{set_stem}_p{proc}.h5") for proc in procs]
+    else:
+        proc_paths = [set_path.joinpath(f"{set_stem}_p{proc}_l{level}.h5") for proc in procs]
+    joint_path = set_path.joinpath(f"{set_stem}_p{procs[0]}_l{level+1}.h5")
+    # Create joint file, overwriting if it already exists
+    with h5py.File(str(joint_path), mode='w') as joint_file:
+        # Setup joint file based on first process file (arbitrary)
+        merge_setup(joint_file, proc_paths[0], axis=axis, N=len(procs))
+        # Merge data from all process files
+        for proc_path in proc_paths:
+            merge_data(joint_file, proc_path)
+    # Cleanup after completed merge, if directed
+    if cleanup:
+        for proc_path in proc_paths:
+            proc_path.unlink()
+
+
+def merge_setup(joint_file, proc_path, axis=None, N=None):
     """
     Merge HDF5 setup from part of a distributed analysis set into a joint file.
 
@@ -198,19 +310,30 @@ def merge_setup(joint_file, proc_path):
             joint_file.attrs['writes'] = writes = len(proc_file['scales']['write_number'])
         # Copy scales (distributed files all have global scales)
         proc_file.copy('scales', joint_file)
+        # Figure out joint shape
         # Tasks
         joint_tasks = joint_file.create_group('tasks')
         proc_tasks = proc_file['tasks']
         for taskname in proc_tasks:
             # Setup dataset with automatic chunking
             proc_dset = proc_tasks[taskname]
-            spatial_shape = proc_dset.attrs['global_shape']
+            # Spatial shape
+            if axis is None:
+                spatial_shape = proc_dset.attrs['global_shape']
+            else:
+                local_shape = np.array(proc_dset.attrs['count'])
+                local_shape[axis] *= N
+                global_shape = np.array(proc_dset.attrs['global_shape'])
+                spatial_shape = np.minimum(local_shape, global_shape)
             joint_shape = (writes,) + tuple(spatial_shape)
             joint_dset = joint_tasks.create_dataset(name=proc_dset.name,
                                                     shape=joint_shape,
                                                     dtype=proc_dset.dtype,
                                                     chunks=True)
             # Dataset metadata
+            joint_dset.attrs['global_shape'] = proc_dset.attrs['global_shape']
+            joint_dset.attrs['start'] = proc_dset.attrs['start']
+            joint_dset.attrs['count'] = spatial_shape
             joint_dset.attrs['task_number'] = proc_dset.attrs['task_number']
             #joint_dset.attrs['constant'] = proc_dset.attrs['constant']
             joint_dset.attrs['grid_space'] = proc_dset.attrs['grid_space']
@@ -244,9 +367,10 @@ def merge_data(joint_file, proc_path):
             joint_dset = joint_file['tasks'][taskname]
             proc_dset = proc_file['tasks'][taskname]
             # Merge across spatial distribution
-            start = proc_dset.attrs['start']
-            count = proc_dset.attrs['count']
-            spatial_slices = tuple(slice(s, s+c) for (s,c) in zip(start, count))
+            pstart = proc_dset.attrs['start']
+            jstart = joint_dset.attrs['start']
+            pcount = proc_dset.attrs['count']
+            spatial_slices = tuple(slice(ps-js, ps-js+c) for (ps,js,c) in zip(pstart, jstart, pcount))
             # Merge maintains same set of writes
             slices = (slice(None),) + spatial_slices
             joint_dset[slices] = proc_dset[:]
