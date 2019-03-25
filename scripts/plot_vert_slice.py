@@ -72,11 +72,11 @@ def main(filename, output_path):
     logger.info('Plotting from file: %s' %filename)
 
     # Plot settings
-    phi = np.pi/4
+    phi = 0
     dpi = 200
     cmap = 'RdBu_r'
     plt.figure(figsize=(6,6))
-    plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
+    plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.95)
 
     # Load temperature perturbation from hdf5
     file = h5py.File(filename, 'r')
@@ -98,7 +98,10 @@ def main(filename, output_path):
     # Background temperature
     T0 = -T.coords['z']
     # Box half-side length
-    s = 1 / np.sqrt(3)
+    sz = 1 / np.sqrt(3)
+    # Box width at phi
+    phi_mod = ((np.pi/4 + phi) % (np.pi/2)) - np.pi/4
+    sx = sz / np.cos(phi_mod)
     # Plot padding
     δ = 0.01
 
@@ -119,12 +122,16 @@ def main(filename, output_path):
         plt.savefig(str(output_path.joinpath('sphere_%06i.png' %writes[i])), dpi=dpi)
         # Save with box
         ## WRONG FOR PHI != 0
-        line, = plt.plot([s,s,-s,-s,s], [-s,s,s,-s,-s], '--k', lw=1)
+        line, = plt.plot([sx,sx,-sx,-sx,sx], [-sz,sz,sz,-sz,-sz], '--k', lw=1, alpha=0.5)
         plt.savefig(str(output_path.joinpath('spherebox_%06i.png' %writes[i])), dpi=dpi)
         line.set_visible(False)
         # Save zoomed to box
-        plt.xlim(-s-δ, s+δ)
-        plt.ylim(-s-δ, s+δ)
+        plt.fill_between([-1.1, 1.1], [sz, sz], [1.1, 1.1], color='white')
+        plt.fill_between([-1.1, 1.1], [-sz, -sz], [-1.1, -1.1], color='white')
+        plt.fill_between([-1.1, -sx], [-1.1, -1.1], [1.1, 1.1], color='white')
+        plt.fill_between([sx, 1.1], [-1.1, -1.1], [1.1, 1.1], color='white')
+        plt.xlim(-1-δ, 1+δ)
+        plt.ylim(-1-δ, 1+δ)
         plt.savefig(str(output_path.joinpath('box_%06i.png' %writes[i])), dpi=dpi)
 
 
