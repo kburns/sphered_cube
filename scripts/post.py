@@ -329,7 +329,7 @@ def merge_setup(joint_file, proc_path, axis=None, N=None):
             joint_dset = joint_tasks.create_dataset(name=proc_dset.name,
                                                     shape=joint_shape,
                                                     dtype=proc_dset.dtype,
-                                                    chunks=True)
+                                                    chunks=(1,32,32,32))
             # Dataset metadata
             joint_dset.attrs['global_shape'] = proc_dset.attrs['global_shape']
             joint_dset.attrs['start'] = proc_dset.attrs['start']
