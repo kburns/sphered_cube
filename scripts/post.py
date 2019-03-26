@@ -162,7 +162,7 @@ def merge_analysis(base_path, cleanup=False):
         merge_distributed_set(set_path, cleanup=cleanup)
 
 
-def tree_merge_analysis(base_path, cleanup=False):
+def tree_merge_analysis(base_path, cleanup=False, maxlevel=0):
     """
     Merge distributed analysis sets from a FileHandler.
 
@@ -186,7 +186,7 @@ def tree_merge_analysis(base_path, cleanup=False):
         if executor is not None:
             set_paths = get_all_sets(base_path, distributed=True)
             for set_path in set_paths:
-                tree_merge_distributed_set(set_path, executor, cleanup=cleanup)
+                tree_merge_distributed_set(set_path, executor, cleanup=cleanup, maxlevel=maxlevel)
 
 
 def merge_distributed_set(set_path, cleanup=False):
@@ -223,10 +223,12 @@ def merge_distributed_set(set_path, cleanup=False):
         set_path.rmdir()
 
 
-def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False):
+def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False, maxlevel=0):
     set_path = pathlib.Path(set_path)
     logger.info("Merging set {}".format(set_path))
     set_stem = set_path.stem
+    if maxlevel == 0:
+        maxlevel = np.inf
     # Get process mesh
     proc_path = set_path.joinpath(f"{set_stem}_p0.h5")
     with h5py.File(str(proc_path), mode='r') as proc_file:
@@ -241,6 +243,8 @@ def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False):
         M = procs.shape[D]
         # Recursively merge blocks
         while M > 1:
+            if level >= maxlevel:
+                break
             futures = []
             chunks = int(np.ceil(M / blocksize))
             proc_blocks = np.array_split(procs, chunks, axis=D)
@@ -255,9 +259,10 @@ def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False):
             level += 1
             wait(futures)
     # Copy final output
-    proc_path = set_path.joinpath(f"{set_stem}_p0_l{level}.h5")
-    joint_path = set_path.parent.joinpath(f"{set_stem}.h5")
-    shutil.copy(str(proc_path), str(joint_path))
+    if np.prod(procs) == 1:
+        proc_path = set_path.joinpath(f"{set_stem}_p0_l{level}.h5")
+        joint_path = set_path.parent.joinpath(f"{set_stem}.h5")
+        shutil.copy(str(proc_path), str(joint_path))
 
 
 def merge_level_procs(set_path, level, procs, axis, cleanup=False):
