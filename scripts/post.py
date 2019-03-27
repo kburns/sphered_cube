@@ -162,7 +162,7 @@ def merge_analysis(base_path, cleanup=False):
         merge_distributed_set(set_path, cleanup=cleanup)
 
 
-def tree_merge_analysis(base_path, cleanup=False, maxlevel=0):
+def tree_merge_analysis(base_path, **kw):
     """
     Merge distributed analysis sets from a FileHandler.
 
@@ -170,8 +170,8 @@ def tree_merge_analysis(base_path, cleanup=False, maxlevel=0):
     ----------
     base_path : str or pathlib.Path
         Base path of FileHandler output
-    cleanup : bool, optional
-        Delete distributed files after merging (default: False)
+
+    Other keyword arguments passed to tree_merge_distributed_sets.
 
     Notes
     -----
@@ -185,8 +185,7 @@ def tree_merge_analysis(base_path, cleanup=False, maxlevel=0):
     with MPICommExecutor() as executor:
         if executor is not None:
             set_paths = get_all_sets(base_path, distributed=True)
-            for set_path in set_paths:
-                tree_merge_distributed_set(set_path, executor, cleanup=cleanup, maxlevel=maxlevel)
+            tree_merge_distributed_sets(set_paths, executor, **kw)
 
 
 def merge_distributed_set(set_path, cleanup=False):
@@ -223,14 +222,14 @@ def merge_distributed_set(set_path, cleanup=False):
         set_path.rmdir()
 
 
-def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False, maxlevel=0):
-    set_path = pathlib.Path(set_path)
-    logger.info("Merging set {}".format(set_path))
-    set_stem = set_path.stem
-    if maxlevel == 0:
+def tree_merge_distributed_sets(set_paths, executor, blocksize=2, cleanup=False, startlevel=0, maxlevel=None):
+    set_paths = [pathlib.Path(sp) for sp in set_paths]
+    logger.info("Merging sets {}".format(set_paths))
+    set_stem = set_paths[0].stem
+    if maxlevel is None:
         maxlevel = np.inf
     # Get process mesh
-    proc_path = set_path.joinpath(f"{set_stem}_p0.h5")
+    proc_path = set_paths[0].joinpath(f"{set_stem}_p0.h5")
     with h5py.File(str(proc_path), mode='r') as proc_file:
         proc_dset = proc_file['tasks']['T']
         global_shape = np.array(proc_dset.attrs['global_shape'])
@@ -251,18 +250,22 @@ def tree_merge_distributed_set(set_path, executor, blocksize=2, cleanup=False, m
             proc_blocks = [procs.reshape((-1, procs.shape[D])) for procs in proc_blocks]
             proc_blocks = [procs.tolist() for procs in proc_blocks]
             proc_blocks = list(itertools.chain(*zip(*proc_blocks)))
-            for proc_block in proc_blocks:
-                f = executor.submit(merge_level_procs, set_path, level, proc_block, D)
-                futures.append(f)
+            if level >= startlevel:
+                # Loop over blocks within sets
+                for set_path in set_paths:
+                    for proc_block in proc_blocks:
+                        f = executor.submit(merge_level_procs, set_path, level, proc_block, D)
+                        futures.append(f)
+                wait(futures)
             procs = procs[axslice(D, None, None, blocksize)]
             M = procs.shape[D]
             level += 1
-            wait(futures)
     # Copy final output
     if np.prod(procs) == 1:
-        proc_path = set_path.joinpath(f"{set_stem}_p0_l{level}.h5")
-        joint_path = set_path.parent.joinpath(f"{set_stem}.h5")
-        shutil.copy(str(proc_path), str(joint_path))
+        for set_path in set_paths:
+            proc_path = set_path.joinpath(f"{set_stem}_p0_l{level}.h5")
+            joint_path = set_path.parent.joinpath(f"{set_stem}.h5")
+            shutil.copy(str(proc_path), str(joint_path))
 
 
 def merge_level_procs(set_path, level, procs, axis, cleanup=False):
