@@ -43,7 +43,7 @@ def matrices(B, N, ell, alpha_BC, R, Prandtl, eta):
                          [Z,Z,Z,I,  Z],
                          [Z,Z,Z,Z,L44]]).tocsr()
 
-        row0=np.concatenate(( np.zeros(N3+1), B.op('r=1',N,0,ell) ))
+        row0=np.concatenate(( np.zeros(N3+1), B.op('r=1',N,1,ell+1)@D(+1,0,0) ))
 
         tau0 = C(0)[:,-1]
         tau0 = tau0.reshape((len(tau0),1))
@@ -114,10 +114,15 @@ def matrices(B, N, ell, alpha_BC, R, Prandtl, eta):
     u0p = B.op('r=1',N,0,ell+1)*B.Q[(ell,1)][1,2]
     N0, N1, N2, N3, N4 = BC_rows(N)
 
+    # No-slip
     row0=np.concatenate(( B.op('r=1',N,0,ell-1), np.zeros(N4-N0)))
     row1=np.concatenate(( np.zeros(N0+1), B.op('r=1',N,0,ell), np.zeros(N4-N1)))
     row2=np.concatenate(( np.zeros(N1+1), B.op('r=1',N,0,ell+1), np.zeros(N4-N2)))
-    row3=np.concatenate(( np.zeros(N3+1), B.op('r=1',N,0,ell) ))
+
+    # No perturbation flux
+    Dr_scalar = ( B.Q[(ell,1)][1,0]*B.op('r=1',N,1,ell-1) @ D(-1,0,0)
+                + B.Q[(ell,1)][1,2]*B.op('r=1',N,1,ell+1) @ D(+1,0,0) )
+    row3=np.concatenate(( np.zeros(N3+1), Dr_scalar ))
 
     tau0 = C(-1)[:,-1]
     tau1 = C( 0)[:,-1]
