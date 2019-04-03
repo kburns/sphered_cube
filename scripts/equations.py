@@ -12,7 +12,7 @@ def BC_rows(N):
     N4 = N + N3 + 1
     return N0,N1,N2,N3,N4
 
-def matrices(B, N, ell, Prandtl, eta, alpha_BC):
+def matrices(B, N, ell, alpha_BC, R, Prandtl, eta):
 
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
@@ -36,7 +36,7 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
                          [Z,Z,Z,Z,  Z],
                          [Z,Z,Z,Z,  Z],
                          [Z,Z,Z,Z,M44]]).tocsr()
-        L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
+        L44 = -D(-1,1,+1).dot(D(+1, 0, 0))/R**2
         L = sparse.bmat([[I,Z,Z,Z,  Z],
                          [Z,I,Z,Z,  Z],
                          [Z,Z,I,Z,  Z],
@@ -76,13 +76,13 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
                    [Z,   Z,   Z, Z, M44]])
     M = M.tocsr()
 
-    L00 = -D(-1,1, 0).dot(D(+1, 0,-1))
-    L11 = -D(-1,1,+1).dot(D(+1, 0, 0))
-    L22 = -D(+1,1, 0).dot(D(-1, 0,+1))
-    L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
+    L00 = -D(-1,1, 0).dot(D(+1, 0,-1))/R**2
+    L11 = -D(-1,1,+1).dot(D(+1, 0, 0))/R**2
+    L22 = -D(+1,1, 0).dot(D(-1, 0,+1))/R**2
+    L44 = -D(-1,1,+1).dot(D(+1, 0, 0))/R**2
 
-    L03 = xim*E(+1,-1).dot(D(-1,0,0))
-    L23 = xip*E(+1,+1).dot(D(+1,0,0))
+    L03 = xim*E(+1,-1).dot(D(-1,0,0))/R
+    L23 = xip*E(+1,+1).dot(D(+1,0,0))/R
 
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
@@ -151,7 +151,7 @@ def matrices(B, N, ell, Prandtl, eta, alpha_BC):
     return M, L
 
 # calculate RHS terms from state vector
-def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, psi):
+def nonlinear(state_vector, RHS, t, M, R, Prandtl, Rayleigh, eta, psi):
     sb = state_vector.simpleball
     B = sb.B
 
@@ -169,15 +169,12 @@ def nonlinear(state_vector, RHS, t, M, Prandtl, Rayleigh, eta, psi):
     # take derivatives
     for ell in range(sb.ell_start,sb.ell_end+1):
         ell_local = ell - sb.ell_start
-        B.curl(ell,1,u['c'][ell_local],om['c'][ell_local])
-        DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local])
+        B.curl(ell,1,u['c'][ell_local]/R,om['c'][ell_local])
+        DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local]/R)
 
     # R = ez cross u
     theta = sb.theta
-    r = sb.r
     ez = np.array([np.cos(theta), -np.sin(theta), 0*np.cos(theta)])
-    z = r*np.cos(theta)
-    T_ref = -z
     u_rhs.layout = 'g'
     T_rhs.layout = 'g'
     u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
