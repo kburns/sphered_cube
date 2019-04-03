@@ -12,7 +12,7 @@ def BC_rows(N):
     N4 = N + N3 + 1
     return N0,N1,N2,N3,N4
 
-def matrices(B, N, ell, alpha_BC, R, Prandtl, eta):
+def matrices(B, N, ell, alpha_BC, R, Prandtl):
 
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
@@ -156,7 +156,7 @@ def matrices(B, N, ell, alpha_BC, R, Prandtl, eta):
     return M, L
 
 # calculate RHS terms from state vector
-def nonlinear(state_vector, RHS, t, M, R, Prandtl, Rayleigh, eta, psi):
+def nonlinear(state_vector, RHS, t, M, R, Prandtl, Rayleigh, epsilon, psi):
     sb = state_vector.simpleball
     B = sb.B
 
@@ -183,10 +183,10 @@ def nonlinear(state_vector, RHS, t, M, R, Prandtl, Rayleigh, eta, psi):
     u_rhs.layout = 'g'
     T_rhs.layout = 'g'
     u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
-    u_rhs['g'] -= 1/eta*psi['g']*u['g']
+    u_rhs['g'] -= 1/epsilon*psi['g']*u['g']
     u_rhs['g'][0] += Rayleigh*ez[0]*T['g'][0]
     u_rhs['g'][1] += Rayleigh*ez[1]*T['g'][0]
-    T_rhs['g'][0] = - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2]) - 1/eta*psi['g']*T['g']
+    T_rhs['g'][0] = - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2]) - 1/epsilon*psi['g']*T['g']
     T_rhs['g'][0] += u['g'][0]*ez[0] + u['g'][1]*ez[1]
 
     # transform (ell, r) -> (ell, N)

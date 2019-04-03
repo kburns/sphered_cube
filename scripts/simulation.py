@@ -33,21 +33,21 @@ L_dealias = 3/2
 N_dealias = 3/2
 
 # Physical parameters
-Prandtl = 1
-Reynolds = 4*N_max**(4/3)
-Rayleigh = Prandtl * Reynolds**2
-t_ff = 1 / Reynolds
 R = np.sqrt(3) / 2
 L_box = 1
+Prandtl = 1
+Danger = 20
+Rayleigh = Danger * Prandtl * (L*N_max/R)**(8/3)
+t_ff = np.sqrt(Rayleigh / Prandtl)
 
 # Volume penalization
-eta = Reynolds**(-1/2) * t_ff
-width = 1 / N_max
+epsilon = (R*N_max/L)**2
+delta = R / N_max
 
 # Temporal discretization
 t_end = 10
-dt = eta / 2
-dt_max = eta / 2
+dt = epsilon / 2
+dt_max = epsilon / 2
 safety = 0.4
 threshold = 0.1
 snapshots_cadence = t_ff/10
@@ -87,7 +87,7 @@ x = r * np.cos(phi) * np.sin(theta)
 y = r * np.sin(phi) * np.sin(theta)
 z = r * np.cos(theta)
 Xinf = np.maximum(np.maximum(np.abs(x), np.abs(y)), np.abs(z))
-psi['g'] = 0.5 + 0.5*np.tanh((Xinf - L_box/2)/width)
+psi['g'] = 0.5 + 0.5*np.tanh((Xinf - L_box/2)/delta)
 
 # build state vector
 def SVWrap(*args):
@@ -102,7 +102,7 @@ M,L,P,LU = [],[],[],[]
 for ell in range(simpleball.ell_start, simpleball.ell_end+1):
     logger.info('Building pencil ell = %i' %ell)
     N = B.N_max - B.N_min(ell-B.R_max)
-    M_ell,L_ell = equations.matrices(B, N, ell, alpha_BC, R, Prandtl, eta)
+    M_ell,L_ell = equations.matrices(B, N, ell, alpha_BC, R, Prandtl)
     M.append(M_ell.astype(np.complex128))
     L.append(L_ell.astype(np.complex128))
     P.append(M_ell.astype(np.complex128))
@@ -152,7 +152,7 @@ iter = 0
 
 while t<t_end:
 
-    equations.nonlinear(state_vector, NL, t, M, R, Prandtl, Rayleigh, eta, psi)
+    equations.nonlinear(state_vector, NL, t, M, R, Prandtl, Rayleigh, epsilon, psi)
 
     if iter % 10 == 0:
         E0 = R**3*np.sum(simpleball.weight_r*simpleball.weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
