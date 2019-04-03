@@ -25,8 +25,8 @@ rank = comm.rank
 size = comm.size
 
 # Spatial discretization
-L_max = 127
-N_max = 127
+L_max = 383
+N_max = 383
 R_max = 3
 alpha_BC = 0
 L_dealias = 3/2
@@ -34,7 +34,7 @@ N_dealias = 3/2
 
 # Physical parameters
 Prandtl = 1
-Reynolds = N_max**(4/3)
+Reynolds = 4*N_max**(4/3)
 Rayleigh = Prandtl * Reynolds**2
 t_ff = 1 / Reynolds
 
@@ -46,14 +46,14 @@ width = 1 / N_max
 t_end = 10
 dt = eta / 2
 dt_max = eta / 2
-safety = 0.5
+safety = 0.4
 threshold = 0.1
-snapshots_cadence = t_ff
+snapshots_cadence = t_ff/10
 snapshots_time = -1e-20
 
 
 # Domain
-mesh = (7, 32)
+mesh = [48,48]
 simpleball = SimpleBall(L_max, N_max, R_max, L_dealias, N_dealias, mesh=mesh)
 domain = simpleball.domain
 B = simpleball.B
@@ -116,11 +116,11 @@ if rank == 0:
 
 theta_index = int((L_max+1)*3/4)
 logger.info(theta_index)
-snapshots = FileHandler(data_dir,domain,B,max_writes=50)
-snapshots.add_task(T,name='T eq',index=0,proj=('theta',theta_index))
-snapshots.add_task(u,name='ur eq',index=0,proj=('theta',theta_index))
+snapshots = FileHandler(data_dir,domain,B,max_writes=1)
 snapshots.add_task(T, name='T', index=0)
-
+snapshots.add_task(u, name='u0', index=0)
+snapshots.add_task(u, name='u1', index=1)
+snapshots.add_task(u, name='u2', index=2)
 t = 0.
 
 reducer = GlobalArrayReducer(domain.dist.comm_cart)
