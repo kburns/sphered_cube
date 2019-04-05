@@ -47,8 +47,8 @@ delta = R / N
 
 # Temporal discretization
 t_end = 100 * t_ff
-dt = epsilon / 2
-dt_max = epsilon / 2
+dt = 1 / epsilon / 2
+dt_max = 1 / epsilon / 2
 safety = 0.4
 threshold = 0.1
 snapshots_cadence = t_ff/10
