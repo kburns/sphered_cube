@@ -183,10 +183,10 @@ def nonlinear(state_vector, RHS, t, M, R, Prandtl, Rayleigh, epsilon, psi):
     u_rhs.layout = 'g'
     T_rhs.layout = 'g'
     u_rhs['g'] = B.cross_grid(u['g'],om['g'])/Prandtl
-    u_rhs['g'] -= 1/epsilon*psi['g']*u['g']
+    u_rhs['g'] -= epsilon*psi['g']*u['g']
     u_rhs['g'][0] += Rayleigh*ez[0]*T['g'][0]
     u_rhs['g'][1] += Rayleigh*ez[1]*T['g'][0]
-    T_rhs['g'][0] = - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2]) - 1/epsilon*psi['g']*T['g']
+    T_rhs['g'][0] = - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2]) - epsilon*psi['g']*T['g']
     T_rhs['g'][0] += u['g'][0]*ez[0] + u['g'][1]*ez[1]
 
     # transform (ell, r) -> (ell, N)
