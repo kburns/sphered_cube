@@ -9,9 +9,9 @@ rank = comm.rank
 size = comm.size
 
 start = 1
-end = 55
-dir = 'rbc_hres'
-L_max = 255
+end = 860
+dir = 'rbc'
+L_max = 383
 L_dealias=3/2
 
 z, weight_r = ball.quadrature(int((L_max+1)*L_dealias-1),a=0.0)
@@ -33,7 +33,7 @@ for i in range(start+rank,end,size):
     print(i,j)
 
     T = 0.5*(np.array(f['tasks/T'][j,:,midm,:]) + np.array(f['tasks/T'][j,:,midp,:]))
-    w =-0.5*(np.array(f['tasks/uth'][j,:,midm,:]) + np.array(f['tasks/uth'][j,:,midp,:]))
+    w =-0.5*(np.array(f['tasks/u1'][j,:,midm,:]) + np.array(f['tasks/u1'][j,:,midp,:]))
 
     Nu = np.sum(w*T*weight_r*(np.pi)/((L_max+1)*L_dealias))
     Nu_list.append(Nu)

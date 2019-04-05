@@ -25,8 +25,9 @@ rank = comm.rank
 size = comm.size
 
 # Spatial discretization
-L_max = 383
-N_max = 383
+N = 255
+L_max = N
+N_max = N
 R_max = 3
 alpha_BC = 0
 L_dealias = 3/2
@@ -34,18 +35,18 @@ N_dealias = 3/2
 
 # Physical parameters
 R = np.sqrt(3) / 2
-L_box = 1
+L = 1
 Prandtl = 1
 Danger = 20
-Rayleigh = Danger * Prandtl * (L*N_max/R)**(8/3)
+Rayleigh = Danger * Prandtl * (L*N/R)**(8/3)
 t_ff = np.sqrt(Rayleigh / Prandtl)
 
 # Volume penalization
-epsilon = (R*N_max/L)**2
-delta = R / N_max
+epsilon = (R*N/L)**2
+delta = R / N
 
 # Temporal discretization
-t_end = 10
+t_end = 100 * t_ff
 dt = epsilon / 2
 dt_max = epsilon / 2
 safety = 0.4
@@ -55,7 +56,7 @@ snapshots_time = -1e-20
 
 
 # Domain
-mesh = [48,48]
+mesh = [24,12]
 simpleball = SimpleBall(L_max, N_max, R_max, L_dealias, N_dealias, mesh=mesh)
 domain = simpleball.domain
 B = simpleball.B
@@ -87,7 +88,7 @@ x = r * np.cos(phi) * np.sin(theta)
 y = r * np.sin(phi) * np.sin(theta)
 z = r * np.cos(theta)
 Xinf = np.maximum(np.maximum(np.abs(x), np.abs(y)), np.abs(z))
-psi['g'] = 0.5 + 0.5*np.tanh((Xinf - L_box/2)/delta)
+psi['g'] = 0.5 + 0.5*np.tanh((Xinf - L/2)/delta)
 
 # build state vector
 def SVWrap(*args):
