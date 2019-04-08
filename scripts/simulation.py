@@ -25,7 +25,7 @@ rank = comm.rank
 size = comm.size
 
 # Spatial discretization
-N = 255
+N = 127
 L_max = N
 N_max = N
 R_max = 3
@@ -36,14 +36,15 @@ N_dealias = 3/2
 # Physical parameters
 R = np.sqrt(3) / 2
 L = 1
+dx = R / N
 Prandtl = 1
 Danger = 20
-Rayleigh = Danger * Prandtl * (L*N/R)**(8/3)
-t_ff = np.sqrt(Rayleigh / Prandtl)
+Rayleigh = Danger * Prandtl * (L / dx)**(8/3)
+t_ff = (Rayleigh * Prandtl)**(-1/2)
 
 # Volume penalization
-epsilon = (R*N/L)**2
-delta = R / N
+epsilon = (L / dx)**2
+delta = dx
 
 # Temporal discretization
 t_end = 100 * t_ff
@@ -56,7 +57,7 @@ snapshots_time = -1e-20
 
 
 # Domain
-mesh = [24,12]
+mesh = [12,32]
 simpleball = SimpleBall(L_max, N_max, R_max, L_dealias, N_dealias, mesh=mesh)
 domain = simpleball.domain
 B = simpleball.B
