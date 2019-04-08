@@ -130,6 +130,5 @@ while t < params.t_end:
     iter += 1
 
 end_time = time.time()
-if rank==0:
-    print('Simulation runtime: %f' %(end_time-start_time))
+logger.info('Simulation runtime: %f' %(end_time-start_time))
 
