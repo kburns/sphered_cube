@@ -6,7 +6,7 @@ from dedalus_sphere import ball_wrapper
 
 class SimpleBall:
 
-    def __init__(self, radius, L_max, N_max, R_max, L_dealias, N_dealias, mesh=None):
+    def __init__(self, radius, L_max, N_max, R_max, L_dealias, N_dealias, mesh=None, comm=None):
         self.radius = radius
         self.L_max = L_max
         self.N_max = N_max
@@ -17,7 +17,7 @@ class SimpleBall:
         phi_basis = de.Fourier('phi', 2*(L_max+1), interval=(0, 2*np.pi), dealias=L_dealias)
         theta_basis = de.Chebyshev('theta', L_max+1, interval=(0, np.pi), dealias=L_dealias)
         r_basis = de.Chebyshev('r', N_max+1, interval=(0, 1), dealias=N_dealias)
-        self.domain = domain = de.Domain([phi_basis, theta_basis, r_basis], grid_dtype=np.float64, mesh=mesh)
+        self.domain = domain = de.Domain([phi_basis, theta_basis, r_basis], grid_dtype=np.float64, mesh=mesh, comm=comm)
         # Local m
         mesh = self.domain.distributor.mesh
         if len(mesh) == 0:

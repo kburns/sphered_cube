@@ -13,7 +13,7 @@ start = 1
 end = 1000
 dir = params.snapshots_dir
 
-SB = SimpleBall(params.R, params.L_max, params.N_max, params.R_max, params.L_dealias, params.N_dealias, mesh=params.mesh)
+SB = SimpleBall(params.R, params.L_max, params.N_max, params.R_max, params.L_dealias, params.N_dealias, comm=MPI.COMM_SELF)
 weight_r = SB.weight_r / SB.r
 
 N_theta = params.L_dealias * (params.L_max + 1)
@@ -31,13 +31,14 @@ for i in range(start+rank, end, size):
     f = h5py.File(filename)
 
     for j in range(len(f['scales/sim_time'])):
-
         print(i,j)
-
-        T = 0.5*(np.array(f['tasks/T'][j, :, midm, :]) + np.array(f['tasks/T'][j, :, midp, :]))
-        w =-0.5*(np.array(f['tasks/u1'][j, :, midm, :]) + np.array(f['tasks/u1'][j, :, midp, :]))
-
-        Nu = (params.R / params.L)**2 * np.sum(weight_r * w * T) * 2 * np.pi / N_phi
+        # Interpolate to midplane
+        T_mid = 0.5 * (f['tasks/T'][j, :, midm, :] + f['tasks/T'][j, :, midp, :])
+        w_mid = -0.5 * (f['tasks/u1'][j, :, midm, :] + f['tasks/u1'][j, :, midp, :])
+        # Integrate over phi
+        Nu = np.sum(w_mid * T_mid, axis=0) * 2 * np.pi / N_phi
+        # Integrate over r
+        Nu = np.sum(weight_r * Nu)
         Nu_list.append(Nu)
         t_list.append(f['scales/sim_time'][j])
 
