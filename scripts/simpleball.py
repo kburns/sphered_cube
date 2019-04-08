@@ -6,7 +6,8 @@ from dedalus_sphere import ball_wrapper
 
 class SimpleBall:
 
-    def __init__(self, L_max, N_max, R_max, L_dealias, N_dealias, mesh=None):
+    def __init__(self, radius, L_max, N_max, R_max, L_dealias, N_dealias, mesh=None):
+        self.radius = radius
         self.L_max = L_max
         self.N_max = N_max
         self.R_max = R_max
@@ -45,16 +46,12 @@ class SimpleBall:
         self.B = B = ball_wrapper.Ball(N_max, L_max, N_theta=N_theta, N_r=N_r, R_max=R_max,
             ell_min=self.ell_start, ell_max=self.ell_end, m_min=self.m_start, m_max=self.m_end, a=0.)
         # Grids
-        theta_global = B.grid(0)
-        r_global = B.grid(1)
-        self.z, self.R = r_global*np.cos(theta_global), r_global*np.sin(theta_global) # global
         grid_slices = phi_layout.slices(domain.dealias)
         self.phi = domain.grid(0, scales=domain.dealias)[grid_slices[0], :, :]
         self.theta = B.grid(1, dimensions=3)[:, grid_slices[1], :] # local
-        self.r = B.grid(2, dimensions=3)[:, :, grid_slices[2]] # local
+        self.r = radius * B.grid(2, dimensions=3)[:, :, grid_slices[2]] # local
         self.weight_theta = B.weight(1, dimensions=3)[:, grid_slices[1], :]
-        self.weight_r = B.weight(2, dimensions=3)[:, :, grid_slices[2]]
-
+        self.weight_r = radius**3 * B.weight(2, dimensions=3)[:, :, grid_slices[2]]
 
 
 class StateVector:

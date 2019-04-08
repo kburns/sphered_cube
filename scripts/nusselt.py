@@ -1,7 +1,7 @@
 
 import numpy as np
 import h5py
-from dedalus_sphere import ball128 as ball
+from simpleball import SimpleBall
 from mpi4py import MPI
 import parameters as params
 
@@ -12,14 +12,15 @@ size = comm.size
 start = 1
 end = 1000
 dir = params.snapshots_dir
-L_max = params.L_max
-L_dealias = params.L_dealias
 
-z, weight_r = ball.quadrature(int((L_max+1)*L_dealias-1),a=0.0)
-weight_r = weight_r[None,:]
+SB = SimpleBall(params.R, params.L_max, params.N_max, params.R_max, params.L_dealias, params.N_dealias, mesh=params.mesh)
+weight_r = SB.weight_r / SB.r
 
-midp = int((L_max+1)*L_dealias/2)
-midm = midp-1
+N_theta = params.L_dealias * (params.L_max + 1)
+N_phi = 2 * N_theta
+
+midp = int(N_theta / 2)
+midm = midp - 1
 
 t_list = []
 Nu_list = []
@@ -33,10 +34,10 @@ for i in range(start+rank, end, size):
 
         print(i,j)
 
-        T = 0.5*(np.array(f['tasks/T'][j,:,midm,:]) + np.array(f['tasks/T'][j,:,midp,:]))
-        w =-0.5*(np.array(f['tasks/u1'][j,:,midm,:]) + np.array(f['tasks/u1'][j,:,midp,:]))
+        T = 0.5*(np.array(f['tasks/T'][j, :, midm, :]) + np.array(f['tasks/T'][j, :, midp, :]))
+        w =-0.5*(np.array(f['tasks/u1'][j, :, midm, :]) + np.array(f['tasks/u1'][j, :, midp, :]))
 
-        Nu = (params.R / params.L)**2 * np.sum(w*T*weight_r*(np.pi)/((L_max+1)*L_dealias))
+        Nu = (params.R / params.L)**2 * np.sum(weight_r * w * T) * 2 * np.pi / N_phi
         Nu_list.append(Nu)
         t_list.append(f['scales/sim_time'][j])
 

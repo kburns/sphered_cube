@@ -23,9 +23,9 @@ rank = comm.rank
 size = comm.size
 
 # Domain and fields
-simpleball = SimpleBall(params.L_max, params.N_max, params.R_max, params.L_dealias, params.N_dealias, mesh=params.mesh)
-domain = simpleball.domain
-B = simpleball.B
+SB = SimpleBall(params.R, params.L_max, params.N_max, params.R_max, params.L_dealias, params.N_dealias, mesh=params.mesh)
+B = SB.B
+domain = SB.domain
 
 u  = ball.TensorField_3D(1, B, domain)
 p  = ball.TensorField_3D(0, B, domain)
@@ -37,9 +37,9 @@ T_rhs = ball.TensorField_3D(0, B, domain)
 psi = ball.TensorField_3D(0, B, domain)
 
 # Initial condition
-r = params.R * simpleball.r
-phi = simpleball.phi
-theta = simpleball.theta
+r = SB.r
+phi = SB.phi
+theta = SB.theta
 
 gshape = domain.dist.grid_layout.global_shape(scales=domain.dealias)
 slices = domain.dist.grid_layout.slices(scales=domain.dealias)
@@ -55,15 +55,15 @@ psi['g'] = 0.5 + 0.5*np.tanh((Xinf - params.L/2) / params.delta)
 
 # State vector
 def SVWrap(*args):
-    return StateVector(simpleball, args)
+    return StateVector(SB, args)
 
-state_vector = StateVector(simpleball, [u, p, T])
-NL = StateVector(simpleball, [u_rhs, p_rhs, T_rhs])
+state_vector = StateVector(SB, [u, p, T])
+NL = StateVector(SB, [u_rhs, p_rhs, T_rhs])
 timestepper = timesteppers.SBDF2(SVWrap, u, p, T)
 
 # Matrices
 M, L, P, LU = [], [], [], []
-for ell in range(simpleball.ell_start, simpleball.ell_end+1):
+for ell in range(SB.ell_start, SB.ell_end+1):
     logger.info('Building pencil ell = %i' %ell)
     N_ell = B.N_max - B.N_min(ell - B.R_max)
     M_ell, L_ell = equations.matrices(B, N_ell, ell, params.alpha_BC, params.R, params.Prandtl)
@@ -110,21 +110,16 @@ dt = params.dt_max
 snapshots_time = -1e-20
 
 while t < params.t_end:
-
     equations.nonlinear(state_vector, NL, t, M, params.R, params.Prandtl, params.Rayleigh, params.epsilon, psi)
-
     if iter % 10 == 0:
         Tmax = np.max(T['g'])
         Tmax = reducer.reduce_scalar(Tmax, MPI.MAX)
         logger.info("iter: {:d}, dt={:e}, t={:e}, T_max={:e}".format(iter, dt, t, Tmax))
-
     if t > snapshots_time:
         snapshots_time += params.snapshots_cadence
         snapshots.process(time.time(), t, dt, iter)
-
     if iter % 10 == 0:
         dt = calculate_dt(dt)
-
     timestepper.step(dt, state_vector, B, L, M, P, NL, LU)
     t += dt
     iter += 1
