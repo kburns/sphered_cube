@@ -3,16 +3,17 @@ import numpy as np
 import h5py
 from dedalus_sphere import ball128 as ball
 from mpi4py import MPI
+import parameters as params
 
 comm = MPI.COMM_WORLD
 rank = comm.rank
 size = comm.size
 
 start = 1
-end = 860
-dir = 'rbc'
-L_max = 383
-L_dealias=3/2
+end = 1000
+dir = params.snapshots_dir
+L_max = params.L_max
+L_dealias = params.L_dealias
 
 z, weight_r = ball.quadrature(int((L_max+1)*L_dealias-1),a=0.0)
 weight_r = weight_r[None,:]

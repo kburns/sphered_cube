@@ -24,6 +24,7 @@ try:
 except ImportError:
     print('Dask unavailable')
 from dedalus.tools.array import axslice
+import parameters as params
 
 import logging
 logger = logging.getLogger(__name__)
@@ -156,7 +157,7 @@ def main(filename, output_path, level=-1):
     logger.info('Plotting from file: %s' %filename)
 
     # Plot settings
-    mesh = [2, 2]
+    mesh = params.mesh
     phi = 0
     dpi = 200
     cmap = 'RdBu_r'
