@@ -14,7 +14,7 @@ end = 1000
 dir = params.snapshots_dir
 
 SB = SimpleBall(params.R, params.L_max, params.N_max, params.R_max, params.L_dealias, params.N_dealias, comm=MPI.COMM_SELF)
-weight_r = SB.weight_r / SB.r
+weight_r = SB.weight_r
 
 N_theta = params.L_dealias * (params.L_max + 1)
 N_phi = 2 * N_theta
@@ -39,6 +39,8 @@ for i in range(start+rank, end, size):
         Nu = np.sum(w_mid * T_mid, axis=0) * 2 * np.pi / N_phi
         # Integrate over r
         Nu = np.sum(weight_r * Nu)
+        # Normalize by box area
+        Nu = Nu / params.L**3
         Nu_list.append(Nu)
         t_list.append(f['scales/sim_time'][j])
 
