@@ -1,5 +1,6 @@
 
 
+import math
 import numpy as np
 import h5py
 import xarray as xr
@@ -23,7 +24,7 @@ dir = 'rbc'
 output_filename = 'Nu.dat'
 
 
-def F_int_phi(hdf5_filename):
+def load_flux_xarray(hdf5_filename):
     """
     Load HDF5. Compute flux. Integrate over phi. Convert to xarray.
     """
@@ -36,25 +37,51 @@ def F_int_phi(hdf5_filename):
     theta = T.coords['theta']
     uz = ur * np.cos(theta) - utheta * np.sin(theta)
     F = T * uz
-    # Integrate over phi
-    F_int = F.sum('theta') * 2 * np.pi / theta.size
     return F_int
 
 
+## Integrate flux over phi
 # Distribute sets in blocks
-blocks = int(np.ceil((1 + last_set - first_set) / size))
-start_set = first_set + rank * blocks
-end_set = min(first_set + (rank + 1) * blocks, last_set + 1)
-# Concatenate assigned set data
+n_sets = last_set - first_set + 1
 F_ints = []
-for i in range(start_set, end_set):
-    logger.info(f'Analyzing output {i}')
+for i in block_distributed_range(n_sets, comm)
+    i += first_set
+    # Load flux
+    logger.info(f'Loading flux {i}')
     hdf5_filename = '%s/%s_s%i.h5' %(dir, dir, i)
-    F_ints.append(F_int_phi(hdf5_filename))
+    F = load_flux_xarray(hdf5_filename)
+    # Integrate over phi
+    F_int['g'] = F.mean('theta').data * 2 * np.pi
+    # Transform to coeff space
+    F['g']
+    F_ints.append(F_int)
+## Interpolate to r and p
+# Gather and concatenate all sets over time
 F_int = xr.concat(F_ints, 't')
-# Gather and concatenate all sets
 F_ints = comm.allgather(F_int)
 F_int = xr.concat(F_ints, 't')
-# Distribute interpolation points
+# Distribute interpolation
+zp_pairs = list(itertools.product(z_grid, p_grid))
+zp_interp = []
+for i in block_distributed_range(zp_pairs.size, comm):
+    z, p = zp_pairs[i]
+    interp = None
+    zp_interp.append(interp)
+# Gather interpolation
+zp_interp = comm.gather(zp_interp, root=0)
+if comm.rank == 0:
+    zp_interp = np.array(zp_interp).reshape((z_grid.size, p_grid.size))
 
-print(F_int)
+
+def block_distributed_range(size, comm):
+    """Block distribute an integer range."""
+    # Basic block distribution
+    block = math.ceil(size / comm.size)
+    start = comm.rank * block
+    end = start + block
+    # Avoid running over the end
+    start = min(start, size)
+    end = min(end, size)
+    # Return local iterator
+    return range(start, end)
+

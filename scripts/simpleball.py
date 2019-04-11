@@ -6,7 +6,9 @@ from dedalus_sphere import ball_wrapper
 
 class SimpleBall:
 
-    def __init__(self, radius, L_max, N_max, R_max, L_dealias, N_dealias, mesh=None, comm=None):
+    def __init__(self, radius, L_max, N_max, R_max, L_dealias, N_dealias, m_max=None, mesh=None, comm=None):
+        if m_max is None:
+            m_max  = L_max
         self.radius = radius
         self.L_max = L_max
         self.N_max = N_max
